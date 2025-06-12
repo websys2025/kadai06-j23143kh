@@ -1,64 +1,78 @@
-# 統計庁 e-Stat のオープンデータAPI
-# 【概要】
-# 日本の公式統計の総合統計ポータルe-Statから、部門別の労働者数のデータを取得し、
-# pandasでDataFrame化して表示する。
-# 【APIエンドポイント】 https://api.e-stat.go.jp/rest/3.0/app/json/getStatsData
-# 【機能】 指定IDに基づく統計データをJSONで取得
-# 【使い方】 API Key (無料登録)を登録し、statsDataIdを指定
 import requests
 import pandas as pd
 
-# 個人のAPI Key
-APP_ID = "8d813ed77283c8a9ff5ed74468de13179addcb78"
+# --------------------------------------------------------
+# kadai6-2.py
+#
+# 参照するオープンデータ:
+# 名称：気象庁（Japan Meteorological Agency）の天気予報データ（試験提供）
+# 概要：本APIは、地点ごとの天気予報や気温予測などの情報をJSON形式で提供する。
+# エンドポイント：https://www.jma.go.jp/bosai/forecast/data/forecast/{area_code}.json
+# 使用方法：
+#   - area_code には地方または都道府県ごとのコードを指定する。
+#   - 例：130000 → 東京都
+# 提供機能：
+#   - 日別の天気予報、最高気温、最低気温、降水確率など
+# --------------------------------------------------------
 
-# e-Stat API URL
-API_URL = "https://api.e-stat.go.jp/rest/3.0/app/json/getStatsData"
+# 東京都（area code: 130000）のデータ取得
+area_code = "130000"
+url = f"https://www.jma.go.jp/bosai/forecast/data/forecast/{area_code}.json"
 
-# パラメータ
-params = {
-    "appId": APP_ID,
-    "lang": "J",
-    "statsDataId": "0003235424",  # 労働務統計
-    "dataFormat": "J",
-    "metaGetFlg": "Y",
-    "explanationGetFlg": "Y",
-    "annotationGetFlg": "Y",
-    "replaceSpChars": 0,
-    "cntGetFlg": "N",
-    "sectionHeaderFlg": 1
-}
+response = requests.get(url)
+weather_data = response.json()
 
-# データ取得
-response = requests.get(API_URL, params=params)
-data = response.json()
+# データから日別天気予報と気温の抽出
+time_series = weather_data[0]['timeSeries'][0]
+dates = time_series['timeDefines']
+import requests
+import pandas as pd
 
-# VALUE部分を抽出
-values = data['GET_STATS_DATA']['STATISTICAL_DATA']['DATA_INF']['VALUE']
-df = pd.DataFrame(values)
+# --------------------------------------------------------
+# kadai6-1.py
+#
+# 参照するオープンデータ:
+# 名称：気象庁（JMA）天気予報オープンデータ
+# エンドポイント：https://www.jma.go.jp/bosai/forecast/data/forecast/{area_code}.json
+# 地域コード：130000（東京都）
+# 提供機能：天気予報、気温、降水確率などを日別に取得可能
+# --------------------------------------------------------
 
-# 各クラスIDと名前の対応を作成
-meta_info = data['GET_STATS_DATA']['STATISTICAL_DATA']['CLASS_INF']['CLASS_OBJ']
+area_code = "130000"
+url = f"https://www.jma.go.jp/bosai/forecast/data/forecast/{area_code}.json"
 
-for class_obj in meta_info:
-    column_name = '@' + class_obj['@id']
-    id_to_name_dict = {}
+response = requests.get(url)
+weather_data = response.json()
 
-    if isinstance(class_obj['CLASS'], list):
-        for obj in class_obj['CLASS']:
-            id_to_name_dict[obj['@code']] = obj['@name']
-    else:
-        obj = class_obj['CLASS']
-        id_to_name_dict[obj['@code']] = obj['@name']
+# --- 天気予報を取得 ---
+time_series_weather = weather_data[0]['timeSeries'][0]
+dates = time_series_weather['timeDefines']
+weathers = time_series_weather['areas'][0]['weathers']
 
-    if column_name in df.columns:
-        df[column_name] = df[column_name].replace(id_to_name_dict)
+# --- 気温情報（ある場合のみ取得） ---
+temps_max = []
+temps_min = []
 
-# 列名をわかりやすいものに置換
-col_replace_dict = {'@unit': '単位', '$': '値'}
-for class_obj in meta_info:
-    org_col = '@' + class_obj['@id']
-    new_col = class_obj['@name']
-    col_replace_dict[org_col] = new_col
+for ts in weather_data[0]['timeSeries']:
+    if 'tempsMax' in ts['areas'][0] and 'tempsMin' in ts['areas'][0]:
+        temps_max = ts['areas'][0]['tempsMax']
+        temps_min = ts['areas'][0]['tempsMin']
+        break
+
+# --- データが不足している場合に備えて補完 ---
+max_len = len(dates)
+temps_max = temps_max + ["―"] * (max_len - len(temps_max))
+temps_min = temps_min + ["―"] * (max_len - len(temps_min))
+
+# --- DataFrameで整形 ---
+df = pd.DataFrame({
+    '日付': dates,
+    '天気予報': weathers,
+    '最高気温': temps_max,
+    '最低気温': temps_min
+})
+
+print(df)
 
 df.columns = [col_replace_dict.get(col, col) for col in df.columns]
 
