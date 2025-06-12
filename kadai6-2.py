@@ -1,3 +1,10 @@
+# 統計庁 e-Stat のオープンデータAPI
+# 【概要】
+# 日本の公式統計の総合統計ポータルe-Statから、部門別の労働者数のデータを取得し、
+# pandasでDataFrame化して表示する。
+# 【APIエンドポイント】 https://api.e-stat.go.jp/rest/3.0/app/json/getStatsData
+# 【機能】 指定IDに基づく統計データをJSONで取得
+# 【使い方】 API Key (無料登録)を登録し、statsDataIdを指定
 import requests
 import pandas as pd
 
